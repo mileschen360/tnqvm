@@ -35,8 +35,45 @@
 #include "TNQVMBuffer.hpp"
 #include "itensor/all.h"
 
+#include <queue>
+
 namespace xacc{
 namespace quantum{
+
+
+class ProbNode{
+public:
+    ProbNode() : 
+        val (-99.), 
+        iqbit (-1), // must be -1, because its child is the probability for qbit 0
+        left (NULL), 
+        right (NULL){}
+
+    ProbNode(double val_in) : 
+        val (val_in), 
+        left (NULL), 
+        right (NULL) {}
+    double val;
+    int iqbit;
+    int outcome;
+    ProbNode* left;
+    ProbNode* right;
+
+    void print(){
+        std::cout<<"("<<iqbit<<", "<<outcome<<", "<<val<<")"<<std::endl;
+    }
+
+    ~ProbNode(){
+        if (left!=NULL){
+            delete left;
+        }
+        if (right!=NULL){
+            delete right;
+        }
+    }
+};
+    
+
 class ITensorMPSVisitor: public AllGateVisitor {
     using ITensor = itensor::ITensor;
     using Index = itensor::Index;
@@ -80,6 +117,11 @@ private:
     int n_qbits;
     bool snapped;
 
+    std::queue<std::vector<ITensor> > bondMats_q;
+    std::queue<std::vector<ITensor> > legMats_q;
+    std::queue<ProbNode*> probnode_q;
+    ProbNode root;
+
     /// init the wave function tensor
     void initWavefunc(int n_qbits);
     void initWavefunc_bysvd(int n_qbits);
@@ -94,6 +136,8 @@ private:
     double averZs(std::set<int> iqbits);
     void snap_wavefunc();
 };
+
+
 
 } // end namespace quantum
 } // end namespace xacc
