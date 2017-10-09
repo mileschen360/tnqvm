@@ -32,6 +32,9 @@
 #include "ITensorMPSVisitor.hpp"
 #include "AllGateVisitor.hpp"
 #include "itensor/all.h"
+
+#include <boost/dynamic_bitset.hpp>
+
 #include <complex>
 #include <cstdlib>
 #include <ctime>
@@ -376,20 +379,30 @@ namespace quantum{
             double rv;
             
             std::cout<<"sampling"<<std::endl;
+            std::vector<boost::dynamic_bitset<> > measurements;
+            boost::dynamic_bitset<> measurement (n_qbits);
             for(int i=0; i<n_samples; ++i){
                 curr = &root;
-
                 while(curr->left!=NULL){
                     rv = (std::rand()%1000000)/1000000.;
                     if (rv<(curr->left->val)){
                         std::cout<<"0";
+                        measurement[curr->left->iqbit] = 0;
                         curr = curr->left;
                     }else{
                         std::cout<<"1";
+                        measurement[curr->right->iqbit] = 1;
                         curr = curr->right;
                     }
                 }
+                measurements.push_back(measurement);
                 std::cout<<std::endl;
+            }
+
+            // test, output accbuffer measurements
+            std::cout<<"samples in accbuffer:"<<std::endl;
+            for(int i=0; i<measurements.size(); ++i){
+                std::cout<<measurements[i]<<std::endl;
             }
 
 
