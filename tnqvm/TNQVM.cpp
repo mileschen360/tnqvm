@@ -29,11 +29,10 @@
  *
  **********************************************************************************/
 #include "TNQVM.hpp"
-#include "ITensorVisitor.hpp"
-#include "ITensorMPSVisitor.hpp"
-#include "ExaTensorVisitor.hpp"
-
-namespace xacc{
+#include "ServiceRegistry.hpp"
+#ifdef TNQVM_HAS_EXATENSOR
+#include "ExaTensorMPSVisitor.hpp"
+#endif
 
 namespace tnqvm {
 
@@ -58,20 +57,59 @@ bool TNQVM::isValidBufferSize(const int NBits) {
 	return NBits <= 1000;
 }
 
+std::vector<std::shared_ptr<AcceleratorBuffer>> TNQVM::execute(
+		std::shared_ptr<AcceleratorBuffer> buffer,
+		const std::vector<std::shared_ptr<Function>> functions) {
+	int counter = 0;
+	std::vector<std::shared_ptr<AcceleratorBuffer>> tmpBuffers;
+	for (auto f : functions) {
+		auto tmpBuffer = createBuffer(
+				buffer->name() + std::to_string(counter), buffer->size());
+		execute(tmpBuffer, f);
+		tmpBuffers.push_back(tmpBuffer);
+		counter++;
+	}
+
+	return tmpBuffers;
+}
+
 void TNQVM::execute(std::shared_ptr<AcceleratorBuffer> buffer,
 		const std::shared_ptr<xacc::Function> kernel) {
 
-	auto visitor = std::make_shared<xacc::quantum::ITensorMPSVisitor>(
-		std::dynamic_pointer_cast<TNQVMBuffer>(buffer));
+	if (!std::dynamic_pointer_cast<TNQVMBuffer>(buffer)) {
+		XACCError("Invalid AcceleratorBuffer, must be a TNQVMBuffer.");
+	}
 
+	auto options = RuntimeOptions::instance();
+	std::string visitorType = "itensor-mps";
+	if (options->exists("tnqvm-visitor")) {
+		visitorType = (*options)["tnqvm-visitor"];
+	}
+
+	// Get the visitor backend
+	visitor = ServiceRegistry::instance()->getService<TNQVMVisitor>(
+			visitorType);
+
+	// Initialize the visitor
+	visitor->initialize(std::dynamic_pointer_cast<TNQVMBuffer>(buffer));
+
+	// Cast to a base instruction visitor for the accept call
+	auto visCast =
+			std::dynamic_pointer_cast<BaseInstructionVisitor>(visitor);
+
+	// Walk the IR tree, and visit each node
 	InstructionIterator it(kernel);
 	while (it.hasNext()) {
 		auto nextInst = it.next();
 		if (nextInst->isEnabled()) {
-			nextInst->accept(visitor);
+			nextInst->accept(
+					visCast);
 		}
 	}
-}
+
+	// Finalize the visitor
+	visitor->finalize();
 
 }
+
 }

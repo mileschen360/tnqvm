@@ -33,8 +33,10 @@
 
 #include "Accelerator.hpp"
 #include "InstructionIterator.hpp"
+#include "TNQVMVisitor.hpp"
+#include "TNQVMBuffer.hpp"
 
-namespace xacc{
+using namespace xacc;
 
 namespace tnqvm {
 
@@ -42,7 +44,7 @@ class TNQVM: public Accelerator {
 public:
 
 	virtual void initialize(){
-		__verbose = 1;
+		__verbose = 0;
 	}
 
 	/**
@@ -86,6 +88,42 @@ public:
 			const std::shared_ptr<xacc::Function> kernel);
 
 	/**
+	 * Execute a set of kernels with one remote call. Return
+	 * a list of AcceleratorBuffers that provide a new view
+	 * of the given one AcceleratorBuffer. The ith AcceleratorBuffer
+	 * contains the results of the ith kernel execution.
+	 *
+	 * @param buffer The AcceleratorBuffer to execute on
+	 * @param functions The list of IR Functions to execute
+	 * @return tempBuffers The list of new AcceleratorBuffers
+	 */
+	virtual std::vector<std::shared_ptr<AcceleratorBuffer>> execute(
+			std::shared_ptr<AcceleratorBuffer> buffer,
+			const std::vector<std::shared_ptr<Function>> functions);
+
+	/**
+	 * Return all relevant TNQVM runtime options.
+	 */
+	virtual std::shared_ptr<options_description> getOptions() {
+		auto desc = std::make_shared<options_description>(
+				"TNQVM Accelerator Options");
+		desc->add_options()("tnqvm-visitor", value<std::string>(),
+				"Provide visitor to be used in mapping IR to a Tensor Network.")
+				("tnqvm-list-visitors", "List the available visitors.");
+		return desc;
+	}
+
+	virtual bool handleOptions(variables_map& map) {
+		if (map.count("tnqvm-list-visitors")) {
+			XACCInfo("Available TNQVM Visitor: itensor-mps");
+			XACCInfo("Available TNQVM Visitor: exatensor-mps");
+			return true;
+		}
+		return false;
+	}
+
+
+	/**
 	 * This Accelerator models QPU Gate accelerators.
 	 * @return
 	 */
@@ -124,10 +162,13 @@ public:
     void mute  () { __verbose = 0; }
     void unmute() { __verbose = 1;} // default to 1
 
+protected:
+
+    std::shared_ptr<TNQVMVisitor> visitor;
+
 private:
 	int __verbose;
 };
-}
 }
 
 #endif
