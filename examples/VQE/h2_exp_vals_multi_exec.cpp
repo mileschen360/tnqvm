@@ -69,6 +69,10 @@ __qpu__ term2(qbit qreg, double theta){
 
 int main (int argc, char** argv) {
 
+	std::ofstream file("energy_vs_theta.csv");
+	file<<"theta, Z_0, Z_1, Z_0 Z_1\n";
+	double pi = 3.14159265359;
+
 	// Initialize the XACC Framework
 	xacc::Initialize(argc, argv);
 
@@ -76,31 +80,26 @@ int main (int argc, char** argv) {
 
 	// Allocate a register of 2 qubits
 	auto qubitReg = qpu->createBuffer("qreg", 2);
+
 	// Create a Program
 	xacc::Program program(qpu, src);
-
+	program.build();
 	int n_terms=3;
+	auto hamiltonianTermKernels = program.getKernels<double>(1, 4);
 
 	// Execute!
-	std::ofstream file("energy_vs_theta.csv");
-	file<<"theta, Z_0, Z_1, Z_0 Z_1\n";
-	double pi = 3.14159265359;
-
 	for(double theta = -pi; theta<=pi; theta += .1){
 		file<<theta;
-		for(int i=0; i<n_terms; ++i){
-			std::string kernel_name = "term"+std::to_string(i);
-			auto measure_term = program.getKernel<double>(kernel_name);
-			qubitReg->resetBuffer();
-			measure_term(qubitReg, theta);
-			auto aver = qubitReg->getExpectationValueZ();
-			file<<", "<<aver;
+
+		auto tempBuffers = hamiltonianTermKernels(qubitReg, theta);
+		for (auto b : tempBuffers) {
+			file << ", ";
+			file << b->getExpectationValueZ();
 		}
-		file<<std::endl;
+		file << "\n";
+		file.flush();
 	}
 	file.close();
-	
-	qubitReg->print(std::cout);
 
 	// Finalize the XACC Framework
 	xacc::Finalize();

@@ -25,20 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Contributors:
- *   Initial implementation - Mengsu Chen 2017.7
+ *   Initial implementation - Mengsu Chen 2017.7, Alex McCaskey
  *
  **********************************************************************************/
 #ifndef QUANTUM_GATE_ACCELERATORS_TNQVM_ITensorMPSVisitor_HPP_
 #define QUANTUM_GATE_ACCELERATORS_TNQVM_ITensorMPSVisitor_HPP_
 
-#include "AllGateVisitor.hpp"
+#include <cstdlib>
+#include "TNQVMVisitor.hpp"
 #include "TNQVMBuffer.hpp"
 #include "itensor/all.h"
-
 #include <queue>
+#include "ProbNode.hpp"
 
-namespace xacc{
-namespace quantum{
+using namespace xacc::quantum;
+
+namespace tnqvm{
+class ITensorMPSVisitor: public TNQVMVisitor {
 
 
 class ProbNode{
@@ -74,13 +77,33 @@ public:
 };
     
 
-class ITensorMPSVisitor: public AllGateVisitor {
     using ITensor = itensor::ITensor;
     using Index = itensor::Index;
     using IndexVal = itensor::IndexVal;
 public:
-    ITensorMPSVisitor(std::shared_ptr<TNQVMBuffer> buffer);
+
+    ITensorMPSVisitor();
     virtual ~ITensorMPSVisitor();
+
+    virtual void initialize(std::shared_ptr<TNQVMBuffer> buffer);
+    virtual void finalize() {}
+
+	/**
+	 * Return the name of this instance.
+	 *
+	 * @return name The string name
+	 */
+	virtual const std::string name() const {
+		return "itensor-mps";
+	}
+
+	/**
+	 * Return the description of this instance
+	 * @return description The description of this object.
+	 */
+	virtual const std::string description() const {
+		return "";
+	}
 
     // one-qubit gates
 	void visit(Hadamard& gate);
@@ -111,6 +134,11 @@ private:
     std::vector<ITensor> bondMats_m;  // the snapshot for measurement
     std::vector<ITensor> legMats_m;
 
+    std::queue<std::vector<ITensor> > bondMats_q;
+    std::queue<std::vector<ITensor> > legMats_q;
+    std::queue<ProbNode*> probnode_q;
+    ProbNode root;
+
     std::set<int> iqbits_m;           // indecies of qbits to measure
 
     itensor::IndexSet legs;           // physical degree of freedom
@@ -139,6 +167,5 @@ private:
 
 
 
-} // end namespace quantum
-} // end namespace xacc
+}
 #endif
